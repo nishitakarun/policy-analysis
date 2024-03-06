@@ -1,0 +1,302 @@
+---
+title: "PE PS 2"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+date: "2023-04-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+library(tidyverse)
+library(kableExtra)
+```
+
+What was the effect of their therapy on the likelihood of committing gun violence for the average high-risk man? 
+
+1. An ideal experiment to answer this question will be a Randomized Control Trial  where we would aim to understand the average treatment effect of the therapy by estimating the difference between the likelihood of an average high-risk man committing gun violence when he is exposed to the Harris program $(Y_1)$ vs the likelihood of an average high-risk man when he is not exposed to the Harris program $(Y_0)$ when all the other characteristics of these average high-risk man are balanced in both these groups which will be termed treatment and control respectively.
+
+The key parameters we require in the dataset to conduct this experiment will be a participant ID, treated ID and if they participated in gun violence or not. To make sure both these data sets only differ on the key parameters, we would aim to control for observable levels such as income, education, employment, age, location and criminal history. 
+
+With this dataset we will run a regression with controls to estimate the Average Treatment Effect of the Harris Program on Gun Violence. The estimated coefficients on the treatment status from the regression will give us the average change in the likelihood of participating in gun violence once the individual has been exposed to the Harris Program. Mathematically it can be seen as:
+
+$$ \tau^{ATE} = \overline{Y(1)} - \overline{Y(0)} = E(Y_i| D_i = 1) - E(Y_i| D_i = 0)$$
+2. What was the effect of their therapy program on gun violence among young men who participated in the program? 
+
+HARRIS would now like to estimate the effect of the program on gun violence among young men who self-selected themselves in this program. Our experiment will now estimate the average treatment effect as a difference between likelihood of gun violence among young men who choose to be a part of the program and received therapy $(Y1)$ to the likelihood of gun violence among young men who choose to be a part of the program and did not receive the therapy $(Y0)$. This will estimate the average treatment effect on the treated, i.e. effect of their therapy program on gun violence for young men who participated in the program. 
+
+This can mathematically be represented as:
+
+$$ \tau^{ATT} = \overline{Y(1)} - \overline{Y(0)} = E(Y_i(1)| D_i = 1) - E(Y_i(0)| D_i = 1)$$
+This estimate is differs from the ATE we estimated in Q1 as now we are only looking at a group who self-selected into this program which is fundamentally different from the larger population who had the choice to participate or not participate. For example a young man who is opting into this program, might be more self-aware about his situation and is taking a step forward to improve his life. Factors like these could cause a selection bias in our estimate. 
+
+In our ATT estimate, the first term is easily observable from the data because it is approximately equal to $Y(1)$ but the second term is unobservables as we never see the untreated outcomes for treated units. In this case, we cannot see the outcomes for an individual who participated in the program but did not receive the therapy. 
+
+3. If we went ahead with this comparison of HARRIS to non HARRIS neighborhoods it would be problematic as we would end up with a naive estimator which does not account for the differences between these two neighborhoods. Three examples on how this could cause bias are as follows:
+
+A) Selection Bias on Observable:Law enforcement in the non-HARRIS neighborhoods could be weaker or stronger bringing in a difference between the baseline level of gun-violence for the two types of neighborhoods, bringing in a bias in our estimate. This kind of bias could also come through characteristics like access to education, school enrollment, job opportunities which would impact our outcome of engagement in gun violence. 
+
+B) Selection Bias on Unobervables: The history of the neighborhood could have an impact on the culture shared by these individuals, making them more susceptible to choosing to be associated with gun violence. Since we are no randomising our selection, we could end up choosing already worse neighborhood in comparision to our treated ones. 
+
+C) Spillover Effects: Given we don't know how these two types of neighborhoods interact, if there is a community aspect to gun-violence there could be positive or negative spillovers from the treated neighborhoods to the control neighborhoods which could bias our estimate. The information from the therapy could be passed across neighborhood borders and affect the non-HARRIS neighborhoods changing them along with the treatment.
+
+4) Read the data into R and, as always, make sure everything makes sense. Document and fix any errors. 
+
+```{r}
+setwd("/Users/nishitakarun/Desktop/Harris/Program Eval/Assignment/2") 
+HARRIS <- read.csv("ps2_data-1.csv")
+
+sapply(HARRIS,summary)
+
+#converting the age category to numeric
+table(HARRIS$age)
+HARRIS$age <- ifelse(HARRIS$age == "thirty-five", "35", HARRIS$age)
+HARRIS$age <- as.numeric(HARRIS$age)
+
+#Given our focus on young men, removing outliers from the data
+HARRIS <- subset(HARRIS, age < 36)
+
+#Checking participants gender to be all male and converting to a numeric
+HARRIS$sex <- ifelse(HARRIS$sex == "MALE", 0, 1)
+
+```
+
+
+```{r}
+#Converting family income and neighborhood to a binary categorical variable for the analysis
+
+table(HARRIS$family_income)
+
+HARRIS <- HARRIS %>% 
+  fastDummies::dummy_cols(select_columns = c("family_income"))
+
+print(names(HARRIS)[grep("family_income", names(HARRIS))])
+
+HARRIS <- HARRIS %>% 
+  fastDummies::dummy_cols(select_columns = c("neighborhood"))
+
+print(names(HARRIS)[grep("neighborhood", names(HARRIS))])
+
+```
+Use the variables contained in the dataset to describe, using math and words, two (related) potential approaches to estimating the effect of HARRIS’ therapy program on gun violence. Make sure to be clear about your unit of analysis, and be explicit about how these designs apply to the HARRIS therapy program (ie, describe things in terms of “gun violence,” not just “outcome”). Hint: HARRIS wants you to describe two selection-on-observables designs.
+
+Through the variables present in the data set we can run two potential approaches to estimate the average effect of the therapy program on gun violence on young men.
+
+The first approach to estimate this average treatment effect is through regression adjustment where when dealing with the two category of individuals who were treated and not treated, we would control for variables which could bring in selection bias. Through this dataset we can control for neighborhood, employment, prior-arrest, family income, age and living with parents to estimate the true effect of the therapy program on gun-violence. Mathematically now we estimate:
+
+$$ Y_i = \alpha+\tau D_i +\nu X_i +ν_i$$
+where Yi is likelihood of gun violence, Di is the effect of the program and Xi includes all the controls which could affect the likelihood of gun violence.
+
+The second approach to estimate the effect will be through matching, where we would compare untreated units to treated units with identical Xis. Difference in outcomes between treated and untreated is our $\hat\tau$ i.e. the estimated likelihood of gun violence after being exposed to the therapy. We will be dividing our data into cells uniquely defined by each of the covariates identified in the data to calculate $Y_T$ which is outcome for the treated and $Y_U$ which is outcomes for the untreated and then taking an weighted average of the 5 potential outcomes to estimate the Average Treatment Effect. Mathematically now we estimate:
+
+$$ \tau^{ATE} = Avg(age(Y_T - Y_U) + fincome(Y_T - Y_U + emp(Y_T - Y_U) + arrest(Y_T - Y_U) + lwithparents(Y_T - Y_U)) + neighborhood(Y_T - Y_U)) $$
+5. 
+
+```{r}
+Reg1_HARRIS <- lapply(HARRIS %>% select(employment, prior_arrest,age,lives_with_parents, starts_with("family_income_"),starts_with("neighborhood_") ), function(x) lm(x ~ harris, data = HARRIS))
+
+bal_tab <- t(sapply(Reg1_HARRIS, function(x) coef(summary(x))[c(2, 8)]))
+
+colnames(bal_tab) <- c("Difference in Means", "p-value")
+
+bal_tab <- bal_tab %>%
+  as.data.frame() %>%
+  kable(digits = 4)
+
+bal_tab
+```
+According to the balance table, we can see that the difference is statistically significant for all the baseline characteristics except living with parents where the p-value is greater than 0.05. This shows that all characteristics except living with parents are not balanced across the treatment and untreated units which makes the experiment more prone to selection bias.
+
+This table makes me feel worse about the concerns in part (3) because as discussed there the two groups differ on observables and will likely on unobservables as well, hence the results will have a higher chance of selection bias. 
+
+Describe the assumptions required for these designs to be valid in math and in words.
+
+6. Both the experiment designs for selection on observables hold the following assumptions:
+
+1. Conditional Independence Assumption: Conditional on observables, treatment assignment is independent of potential outcomes ${Y(1)} , {Y(0)}$, this would mean that in our experiment once we control through the six identified covariates ${X_i}$ there would be no selection bias in the estimate for gun violence. This can be represented mathematically through:
+
+$$ {Y(1)} , {Y(0)} (Independent of)  D_i|X_i $$
+2. Common Support Assumption: For all the possible X’s ie. our six covariates, we should be able to observe both the treated and untreated. It means that across the selected coavriates, there should be a young man exposed and not exposed to the HARRIS Program. 
+
+(add image of formula)
+
+3. Functional Form Assumption: Besides these assumptions, to follow through this approach, we also require $\overline{X_T}$ and $\overline{X_U}$ which are the means of the selected covariates to be close to each other, otherwise there will be a bias. From the balance table we can see that it is not true and will further cause errors in our analysis. Hence, we assume a functional form to run the regression where we assume the true relationship is $ Y_i = \alpha+\tau D_i +\nu X_i +ν_i$.
+
+This approach of SOO, makes an extremely strong conditional independence assumption as in spite of adding six controls into the experiement, there could be multiple observable and unobservable factors that could influence the gun violence. Hence, we cannot say that by adding these controls our experiment is now completely random. We saw this through our balance table, where only one out of six covariates is actually balanced on an average. 
+
+On the second assumption, we can test the common support for each varible:
+
+```{r}
+#Checking for the common support assumption for each variable
+
+HARRIS %>%
+  group_by(neighborhood) %>%
+  summarize(n_harris = sum(harris == 1),
+            n_non_harris = sum(harris == 0),
+            .groups = "keep") 
+```
+
+Since Park Manor and South Shore don't have the treatment present, the neighborhood variable does not support the common support assumption. This isn't a good sign, because it means that we won't have a good counterfactual for many cells. 
+
+Given location is an important aspect of how susceptible these young men are to gun violence, it would be valid to include the dummy variables of the neighborhoods which have both treated and untreated units in our analysis. 
+
+```{r}
+#Checking for the common support assumption for each variable
+
+HARRIS %>%
+  group_by(employment) %>%
+  summarize(n_harris = sum(harris == 1),
+            n_non_harris = sum(harris == 0),
+            .groups = "keep") 
+
+#Employment holds the common support assumption.
+```
+
+```{r}
+#Checking for the common support assumption for each variable
+
+HARRIS %>%
+  group_by(prior_arrest) %>%
+  summarize(n_harris = sum(harris == 1),
+            n_non_harris = sum(harris == 0),
+            .groups = "keep") 
+
+#Prior Arrest holds the common support assumption.
+```
+
+```{r}
+#Checking for the common support assumption for each variable
+
+HARRIS %>%
+  group_by(family_income) %>%
+  summarize(n_harris = sum(harris == 1),
+            n_non_harris = sum(harris == 0),
+            .groups = "keep") 
+```
+Since the groups of income <$20,000, >$50,000 and $40,000 - $50,000 don't have any treated units, the family income variable does not support the common support assumption. This isn't a good sign, because it means that we won't have a good counterfactual for many cells. 
+
+Given family income does positively co-vary with gun violence, as it makes young men more prone to criminal activities, it would be valid to include the dummy variables of the family income which have both treated and untreated units in our analysis. 
+
+
+```{r}
+#Checking for the common support assumption for each variable
+
+HARRIS %>%
+  group_by(age) %>%
+  summarize(n_harris = sum(harris == 1),
+            n_non_harris = sum(harris == 0),
+            .groups = "keep") 
+```
+
+Since the age group of 14-18 don't have any treated units, the age variable does not support the common support assumption. This isn't a good sign, because it means that we won't have a good counter factual for many cells. 
+
+I believe we would not be able to obtain a credible estimate from the given data as the extremely strong assumption are failing for multiple variables. For example Out of the six provided covariates, only lives with parents follows the conditional independence assumption as it is balanced while only prior arrest and employment follow the common support assumption. Based on this we can predict that there would be a high chance of selection bias as the treatment and control differ significantly. This would mean that the effect on the therapy on them could be very different depending on their baseline characteristics. 
+
+While it would be difficult to produce a credible estimate through this approach for the larger data set we can further reduce our sample group to neighborhoods and family income groups which follow the common support assumption to get more precise estimate. We can continue with our experiment by focusing on these variables.
+
+7. For the regression approach, I would like to go ahead with the following variables: 
+
+A. Neighborhood & Family Income: As mentioned above, in spite of not clearing the common support assumption, I would like to go ahead with including the dummy variables which meet the assumption as this co variate has a strong relationship with gun violence and would be important to control the difference between treated and untreated.
+
+B. Employment & Prior Arrest: These covariate meet the common support assumption but are not balanced, hence I would be skeptical that the regression will extropolate and the results might not be accurate. But given their relationship with gun violence, I believe it is important to include them in the experiment.
+
+I would be leaving out the following variables:
+
+A. Sex: The study only includes male members and hence there is no information which will be added through this covariate. 
+
+B. Age: Age does not meet the common support assumption. 
+
+C. Lives with Parents: This covariate is significantly balanced and will add no new information to the regression. 
+
+```{r}
+Reg2_HARRIS <- lm(gun_violence ~ harris + prior_arrest + employment + `family_income_$20,000 - $30,000` + `family_income_$30,000 - $40,000` + neighborhood_KENWOOD + neighborhood_OAKLAND + neighborhood_ENGLEWOOD, data = HARRIS)
+
+summary(Reg2_HARRIS)
+```
+For young men who were offered the HARRIS therapy program the likelihood of being engaged in gun violence in increased by 0.29 percentage points all else held constant. The results are not statistically significant at the 0.05 value threshold. 
+
+What are the strengths and weaknesses of this approach? 
+
+The strength of the regression adjustment approach is that it provides an estimate of the treatment effect adjusting for the confounding factors. It allows us to control for multiple covariates simultaneously. A major weakness is the reliance on the assumptions, (especially the functional form assumptions for adjustment) this may not always be verifiable and may be violated in practice.
+
+The strength of this approach is that we get a clear estimate through the regression by adjusting for covariates. The weakness is that we ignore other observable and unobservables which could be different between the two groups and affect the likelihood of gun violence. As mentioned above the functional form assumptions have to be true and we saw in the balanced table, they only overlap for one covariate out of the six. This parametric approach makes the estimates more susceptible to selection bias, and the strong assumptions made may be violated in practice. 
+
+```{r}
+NaiveEst_HARRIS <- lm(gun_violence ~ harris, data = HARRIS)
+
+summary(NaiveEst_HARRIS)
+```
+While the regression approach showed an increase of 0.29 percentage points, the naive estimator shows a decrease of 0.25 percentage points. This estimate differs  as we have tried to account for the differences in the observed characteristics between the groups in the regression method for SOO. Hence, the first estimate will be considered more accurate and reliable to estimate the true treatment effect.
+
+8. For the matching approach, I would like to go ahead with the following variables for the same reasons as above:
+
+A. Neighborhood & Family Income
+
+B. Employment & Prior Arrest
+
+C. Lives with Parents
+
+In this approach, besides the common support age would also be left out as it is a continuous variable which would not work for matching.
+
+With these possible groups, let's try to calculate a treatment effect:
+
+```{r}
+HARRIS$control <- 1 - HARRIS$harris
+
+# calculate the means by cell * treatment status
+grp_H <- HARRIS %>%
+  group_by(prior_arrest,employment,`family_income_$20,000 - $30,000`, `family_income_$30,000 - $40,000`, neighborhood_KENWOOD, neighborhood_OAKLAND, neighborhood_ENGLEWOOD) %>%
+  summarize(mean_gun_violence_harris = 
+              sum(gun_violence*harris)/sum(harris),
+            mean_gun_violence_non_harris = sum(gun_violence*control)/sum(control),
+            count_harris = sum(harris),
+            count_non_harris= sum(control),
+            .groups = "keep")
+
+# Take difference for each cell
+grp_H$diff <- grp_H$mean_gun_violence_harris - grp_H$mean_gun_violence_non_harris
+grp_fin_H <- grp_H %>% filter(!is.na(diff))
+
+grp_fin_H
+```
+
+To estimate Question (1): ATE and Question (2): ATT we use different weights. The results are the very close in magnitude. You would expect these results, as in exact matching we have reduced the sample size by matching each individual in the treatment group is matched to an identical individual in the control group. The homogeneous treatment effect in this exact matching experiment ensures that both the treatment and control groups have the same distribution of covariates giving us the same ATE and ATT. 
+
+```{r}
+# Estimate tau_ate as weighted average
+ate <- weighted.mean(grp_fin_H$diff, 
+                     w = (grp_fin_H$count_harris + grp_fin_H$count_non_harris)) 
+ate
+
+# Estimate the tau_att as as weighted average
+att <- weighted.mean(grp_fin_H$diff,
+                     w = grp_fin_H$count_harris) 
+att
+```
+
+What are the strengths and weaknesses of this approach?
+
+Strengths: Through exact matching, we are able to ensure that the treatment and control groups have identical distributions of covariates which helps in improving the accuracy of the estimated treatment effect. Exact matching can also handle binary covariates without requiring any assumptions about the functional form of the relationship between the covariate and the outcome. In comparison to the regression approach it is also non-parametric and more flexible. 
+
+Weaknesses: When the number of covariates are increased in the experiment the sample size is reduced significantly due to the curse of dimensionality. Also, this method cannot include continuous variables like age and would require an additional step of grouping them into categories. Due to the reduced size, it may not be representative of the general population.
+
+How do your results differ from what you find if you instead use the naive estimator? From what you found in (7)?
+
+In contrast to the reduction of 0.25 percentage points in gun violence seen in the naive estimator, here we see an increase of 0.045 percentage points in gun violence after the program. Since the naive estimator does not account for differences in covariates between treated and untreated which exact matching does, the estimates have a higher possibility of being inaccurate.
+
+In contrast to regression estimate of increase by 0.29 percentage points, the estimate of 0.045 percentage points is significantly lower as to get this estimate we let go of the functional form assumptions plus we sub-setted the data for results for a smaller sample group not the larger population. 
+
+Yes, as we added 4 covariates into the experiment the sample size was significantly reduced from 15,000 observations to only 6 to satisfy the conditions of exact matching. Hence, now we can only comment on this very small sub-set of young men and their average treatment effect which is not relevant for the larger population.  
+
+9. The estimated in (7) and (8) showcase that the therapy program by HARRIS increased the likelihood of young men participating in gun violence. Hence, solely based on the estimates I would not recommend the new mayor to continue with the program as it is now achieving its results of reducing gun violence.
+
+10. Are you confident about your recommendation in (9)? If yes, please make sure to tell HARRIS why you believe your results in (7) and (8). If no, please make sure to tell HARRIS why you are skeptical.
+
+I am not confident about my recommendation in (9) as the overall estimates are produced under very heavy assumptions like conditional independence and common support through both the methods. It is confusing how a program which intended to decrease the engagement on young men in gun violence has ended up increasing it, making me very skeptical about the experiment design of selection on observables. Even through we have tried to control for the observables or matched on same covariates, there could be other observables or unobservables which could cause omitted variable and selection bias. 
+
+The regression methods uses the functional form assumption where the adjustment made in this experiment is correctly specified. If the true relationship is not captured from the chosen model, the results can be biased. Exact matching has also produced results which are only relevant for the small sample size and cannot be extended to the larger generic population. When conducted the matching might even by perfect which could cause more errors in the estimate. This method could also result in overfitting, since many variables need to be matched to individuals. 
+
+Thinking through all these concerns, this approach may not be the best way to estimate the treatment affects of the HARRIS program. 
+
